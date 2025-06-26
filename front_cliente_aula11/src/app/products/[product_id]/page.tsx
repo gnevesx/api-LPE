@@ -5,6 +5,12 @@ import { useEffect, useState } from "react";
 import { toast } from 'sonner';
 import { useGlobalStore } from "@/context/GlobalStore";
 import Link from "next/link";
+import Image from "next/image"; // CORREÇÃO: Importando o componente Image do Next.js
+
+// --- Tipagem para a resposta de erro da API ---
+type ApiError = {
+    message: string;
+}
 
 export default function ProductDetails() {
     const params = useParams();
@@ -20,18 +26,18 @@ export default function ProductDetails() {
     useEffect(() => {
         async function fetchProductDetails() {
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_URL_API}/products/${productId}`);
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products/${productId}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                const data = await response.json();
+                const data: ProductItf = await response.json();
                 setProduct(data);
                 if (data.stock > 0) {
                     setQuantityToAdd(1);
                 } else {
                     setQuantityToAdd(0);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) { // CORREÇÃO: Usando 'unknown' em vez de 'any'
                 console.error("Erro ao buscar detalhes do produto:", err);
                 setError("Não foi possível carregar os detalhes do produto.");
             } finally {
@@ -66,11 +72,12 @@ export default function ProductDetails() {
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_URL_API}/cart/add`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/add`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-access-token": user.token
+                    // CORREÇÃO: Usando o cabeçalho de autenticação padrão "Bearer"
+                    "Authorization": `Bearer ${user.token}`
                 },
                 body: JSON.stringify({
                     productId: product.id,
@@ -83,7 +90,7 @@ export default function ProductDetails() {
                 addToCartLocal(product.id, quantityToAdd);
                 setProduct(prev => prev ? { ...prev, stock: prev.stock - quantityToAdd } : null);
             } else {
-                const errorData = await response.json();
+                const errorData: ApiError = await response.json();
                 toast.error(errorData.message || "Erro ao adicionar produto ao carrinho.");
             }
         } catch (error) {
@@ -105,19 +112,24 @@ export default function ProductDetails() {
     }
 
     return (
-        // Container principal com fundo sutil e padding
         <section className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-            {/* Card do produto com sombra e bordas arredondadas */}
             <div className="max-w-6xl w-full mx-auto p-8 bg-white rounded-2xl shadow-2xl dark:bg-gray-800 flex flex-col md:flex-row gap-10">
                 <div className="md:w-1/2 flex-shrink-0">
-                    <img className="w-full h-auto object-cover rounded-xl shadow-lg transform hover:scale-105 transition-transform duration-300"
-                        src={product.imageUrl || "/placeholder-image.png"} alt={product.name} />
+                    {/* CORREÇÃO: Usando o componente Image do Next.js para otimização */}
+                    <Image
+                        className="w-full h-auto object-cover rounded-xl shadow-lg transform hover:scale-105 transition-transform duration-300"
+                        src={product.imageUrl || "/placeholder-image.png"}
+                        alt={product.name}
+                        width={600}
+                        height={600}
+                        priority // Opcional: Prioriza o carregamento da imagem principal da página
+                    />
                 </div>
                 <div className="md:w-1/2 flex flex-col justify-between">
                     <div>
-                        <h5 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white mb-4 leading-tight">
+                        <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white mb-4 leading-tight">
                             {product.name}
-                        </h5>
+                        </h1>
                         <p className="text-lg text-gray-700 dark:text-gray-300 mb-6 border-b border-gray-200 dark:border-gray-700 pb-6">
                             {product.description || "Nenhuma descrição disponível."}
                         </p>
@@ -129,9 +141,9 @@ export default function ProductDetails() {
                         </div>
                     </div>
                     <div className="mt-8">
-                        <h5 className="text-4xl font-bold text-gray-700 dark:text-gray-400 mb-6"> {/* Preço em cinza */}
-                            Preço: R$ {Number(product.price).toLocaleString("pt-br", { minimumFractionDigits: 2 })}
-                        </h5>
+                        <h2 className="text-4xl font-bold text-gray-700 dark:text-gray-400 mb-6">
+                            R$ {Number(product.price).toLocaleString("pt-br", { minimumFractionDigits: 2 })}
+                        </h2>
 
                         {user.id ? (
                             <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-4">
@@ -143,25 +155,21 @@ export default function ProductDetails() {
                                     max={product.stock > 0 ? product.stock : 1}
                                     value={quantityToAdd}
                                     onChange={(e) => {
-                                        const value = parseInt(e.target.value);
-                                        if (value > product.stock) {
-                                            setQuantityToAdd(product.stock);
-                                        } else if (value < 1) {
-                                            setQuantityToAdd(1);
-                                        } else {
-                                            setQuantityToAdd(value);
-                                        }
+                                        const value = parseInt(e.target.value, 10);
+                                        if (isNaN(value)) setQuantityToAdd(1);
+                                        else if (value > product.stock) setQuantityToAdd(product.stock);
+                                        else if (value < 1) setQuantityToAdd(1);
+                                        else setQuantityToAdd(value);
                                     }}
-                                    className="w-full sm:w-28 p-3 border border-gray-300 rounded-lg text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white focus:ring-gray-500 focus:border-gray-500 transition-colors" /* Foco em cinza */
+                                    className="w-full sm:w-28 p-3 border border-gray-300 rounded-lg text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white focus:ring-gray-500 focus:border-gray-500 transition-colors"
                                 />
                                 <button
                                     onClick={handleAddToCart}
                                     disabled={product.stock <= 0 || quantityToAdd <= 0}
-                                    className={`inline-flex items-center justify-center w-full sm:w-auto px-8 py-3 text-lg font-semibold text-center text-white rounded-lg focus:ring-4 focus:outline-none transition-all duration-300 transform hover:-translate-y-0.5 ${
-                                        product.stock <= 0 || quantityToAdd <= 0
+                                    className={`inline-flex items-center justify-center w-full sm:w-auto px-8 py-3 text-lg font-semibold text-center text-white rounded-lg focus:ring-4 focus:outline-none transition-all duration-300 transform hover:-translate-y-0.5 ${product.stock <= 0 || quantityToAdd <= 0
                                             ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
-                                            : 'bg-gray-700 hover:bg-gray-800 focus:ring-gray-300 dark:bg-gray-700 dark:hover:bg-gray-800 dark:focus:ring-gray-800' /* Botão em cinza */
-                                    }`}
+                                            : 'bg-gray-700 hover:bg-gray-800 focus:ring-gray-300 dark:bg-gray-700 dark:hover:bg-gray-800 dark:focus:ring-gray-800'
+                                        }`}
                                 >
                                     Adicionar ao Carrinho
                                     <svg className="w-6 h-6 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -169,10 +177,10 @@ export default function ProductDetails() {
                             </div>
                         ) : (
                             <h2 className="text-xl text-gray-900 dark:text-white mt-6">
-                                <Link href="/login" className="text-gray-700 hover:underline dark:text-gray-400">Faça login</Link> para adicionar ao carrinho! {/* Link em cinza */}
+                                <Link href="/login" className="text-gray-700 hover:underline dark:text-gray-400">Faça login</Link> para adicionar ao carrinho!
                             </h2>
                         )}
-                        <Link href="/" className="mt-8 inline-block text-gray-700 hover:underline dark:text-gray-400 text-lg font-medium"> {/* Link em cinza */}
+                        <Link href="/" className="mt-8 inline-block text-gray-700 hover:underline dark:text-gray-400 text-lg font-medium">
                             &larr; Voltar para a Loja
                         </Link>
                     </div>

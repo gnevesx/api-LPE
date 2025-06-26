@@ -4,13 +4,21 @@ import { useGlobalStore } from "@/context/GlobalStore";
 import { toast } from 'sonner';
 import { ProductItf } from "@/utils/types/ProductItf";
 import Link from "next/link";
+import Image from "next/image"; // CORREÇÃO: Importando o componente Image do Next.js
 
+// --- Tipagem dos Itens do Carrinho ---
 interface CartItemItf {
     id: string;
     quantity: number;
     productId: string;
     cartId: string;
     product: ProductItf;
+}
+
+// --- Tipagem da resposta da API do carrinho ---
+interface CartApiResponse {
+    cartItems: CartItemItf[];
+    // Adicione outras propriedades se a API retornar mais dados
 }
 
 export default function CartPage() {
@@ -26,16 +34,19 @@ export default function CartPage() {
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_URL_API}/cart/${user.id}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/${user.id}`, {
                 headers: {
-                    "x-access-token": user.token as string,
+                    // CORREÇÃO: Usando o cabeçalho de autenticação padrão "Bearer"
+                    "Authorization": `Bearer ${user.token}`,
                 },
             });
 
             if (response.ok) {
-                const data = await response.json();
-                setCartItems(data.cartItems || []);
-                setGlobalCartItems(data.cartItems.map((item: any) => ({ productId: item.productId, quantity: item.quantity })));
+                const data: CartApiResponse = await response.json();
+                const items = data.cartItems || [];
+                setCartItems(items);
+                // CORREÇÃO: Removido o 'any' e usando o tipo inferido de 'items'
+                setGlobalCartItems(items.map(item => ({ productId: item.productId, quantity: item.quantity })));
             } else {
                 toast.error("Erro ao carregar o carrinho.");
                 setCartItems([]);
@@ -77,11 +88,12 @@ export default function CartPage() {
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_URL_API}/cart/update/${cartItemId}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/update/${cartItemId}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-access-token": user.token as string,
+                    // CORREÇÃO: Usando o cabeçalho de autenticação padrão "Bearer"
+                    "Authorization": `Bearer ${user.token}`,
                 },
                 body: JSON.stringify({ quantity: newQuantity }),
             });
@@ -89,7 +101,9 @@ export default function CartPage() {
             if (response.ok) {
                 toast.success("Quantidade atualizada!");
                 setCartItems(prevItems => prevItems.map(item => item.id === cartItemId ? { ...item, quantity: newQuantity } : item));
-                updateCartItemQuantityLocal(itemToUpdate?.productId || '', newQuantity);
+                if (itemToUpdate) {
+                    updateCartItemQuantityLocal(itemToUpdate.productId, newQuantity);
+                }
             } else {
                 const errorData = await response.json();
                 toast.error(errorData.message || "Erro ao atualizar quantidade.");
@@ -105,26 +119,28 @@ export default function CartPage() {
             toast.error("Erro de autenticação. Faça login novamente.");
             return;
         }
-
+        
+        // NOTA: O uso de 'confirm' pode ser substituído por um modal customizado para melhor UX.
         if (!confirm("Tem certeza que deseja remover este item do carrinho?")) {
             return;
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_URL_API}/cart/remove/${cartItemId}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/remove/${cartItemId}`, {
                 method: "DELETE",
                 headers: {
-                    "x-access-token": user.token as string,
+                    // CORREÇÃO: Usando o cabeçalho de autenticação padrão "Bearer"
+                    "Authorization": `Bearer ${user.token}`,
                 },
             });
 
             if (response.ok) {
                 toast.success("Item removido do carrinho!");
-                setCartItems(prevItems => prevItems.filter(item => item.id !== cartItemId));
                 const removedItem = cartItems.find(item => item.id === cartItemId);
                 if (removedItem) {
                     removeFromCartLocal(removedItem.productId);
                 }
+                setCartItems(prevItems => prevItems.filter(item => item.id !== cartItemId));
             } else {
                 const errorData = await response.json();
                 toast.error(errorData.message || "Erro ao remover item.");
@@ -145,16 +161,18 @@ export default function CartPage() {
             toast.info("Seu carrinho está vazio.");
             return;
         }
-
+        
+        // NOTA: O uso de 'confirm' pode ser substituído por um modal customizado para melhor UX.
         if (!confirm("Confirma a finalização da compra?")) {
             return;
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_URL_API}/cart/checkout`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/checkout`, {
                 method: "POST",
                 headers: {
-                    "x-access-token": user.token as string,
+                    // CORREÇÃO: Usando o cabeçalho de autenticação padrão "Bearer"
+                    "Authorization": `Bearer ${user.token}`,
                 },
             });
 
@@ -175,7 +193,6 @@ export default function CartPage() {
 
     if (!user.id) {
         return (
-            // Mensagem para usuário não logado
             <section className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-8 px-4">
                 <div className="text-center text-xl text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl max-w-md">
                     <p>Por favor, <Link href="/login" className="text-gray-600 hover:underline dark:text-gray-400">faça login</Link> para ver seu carrinho.</p>
@@ -205,23 +222,23 @@ export default function CartPage() {
     }
 
     return (
-        // Container principal da página com fundo cinza claro para o layout geral
         <section className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-            {/* Card principal do carrinho */}
             <div className="max-w-5xl mx-auto p-4 md:p-8 bg-white dark:bg-gray-800 rounded-xl shadow-2xl space-y-8">
                 <h1 className="text-3xl md:text-4xl font-extrabold text-center text-gray-900 dark:text-white">
-                    🛒 Seu <span className="text-gray-700 dark:text-gray-400">Carrinho de Compras</span> {/* Destaque em cinza */}
+                    🛒 Seu <span className="text-gray-700 dark:text-gray-400">Carrinho de Compras</span>
                 </h1>
 
                 {cartItems.map((item) => (
-                    // Card de cada item do carrinho
                     <div
                         key={item.id}
                         className="flex flex-col md:flex-row items-center gap-4 bg-gray-100 dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
                     >
-                        <img
+                        {/* CORREÇÃO: Usando o componente Image do Next.js para otimização */}
+                        <Image
                             src={item.product.imageUrl || "/placeholder-image.png"}
                             alt={item.product.name}
+                            width={96}
+                            height={96}
                             className="w-24 h-24 object-cover rounded-md flex-shrink-0"
                         />
 
@@ -272,7 +289,7 @@ export default function CartPage() {
 
                 <div className="flex flex-col sm:flex-row justify-between items-center mt-8 border-t border-gray-200 dark:border-gray-700 pt-6 gap-4">
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                        Total: <span className="text-gray-700 dark:text-gray-400">R$ {totalPrice.toLocaleString("pt-br", { minimumFractionDigits: 2 })}</span> {/* Destaque do total em cinza */}
+                        Total: <span className="text-gray-700 dark:text-gray-400">R$ {totalPrice.toLocaleString("pt-br", { minimumFractionDigits: 2 })}</span>
                     </div>
                     <button
                         onClick={handleCheckout}
