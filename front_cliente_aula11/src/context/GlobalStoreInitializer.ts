@@ -9,6 +9,8 @@ interface UserData {
     name: string;
     email: string;
     role: 'ADMIN' | 'VISITOR';
+    createdAt?: string; 
+    updatedAt?: string;
 }
 
 interface CartItemData {
@@ -35,7 +37,6 @@ export function GlobalStoreInitializer() {
             if (storedUserId && storedUserToken && !user.id) {
                 const autoLoginAndFetchCart = async () => {
                     try {
-                        // CORREÇÃO: Usando o cabeçalho de autenticação padrão "Bearer"
                         const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${storedUserId}`, {
                             headers: {
                                 "Authorization": `Bearer ${storedUserToken}`,
@@ -44,12 +45,17 @@ export function GlobalStoreInitializer() {
 
                         if (userResponse.ok) {
                             const userData: UserData = await userResponse.json();
+                            
+                            // CORREÇÃO: Garantindo que createdAt e updatedAt sempre tenham um valor string.
+                            // Se a API não os retornar, usamos a data atual como fallback.
                             const userToLogin = { 
                                 ...userData, 
                                 token: storedUserToken,
-                                createdAt: (userData as any).createdAt ?? new Date().toISOString(),
-                                updatedAt: (userData as any).updatedAt ?? new Date().toISOString()
+                                createdAt: userData.createdAt || new Date().toISOString(),
+                                updatedAt: userData.updatedAt || new Date().toISOString(),
                             };
+
+                            // Agora o tipo de userToLogin corresponde ao que UserItf espera.
                             loginUser(userToLogin);
 
                             // Busca o carrinho apenas após o login bem-sucedido
@@ -61,7 +67,6 @@ export function GlobalStoreInitializer() {
 
                             if (cartResponse.ok) {
                                 const cartData: CartApiResponse = await cartResponse.json();
-                                // CORREÇÃO: Removido 'any', usando 'CartItemData'
                                 setCartItems(cartData.cartItems.map((item: CartItemData) => ({
                                     productId: item.productId,
                                     quantity: item.quantity
@@ -100,7 +105,6 @@ export function GlobalStoreInitializer() {
                     });
                     if (cartResponse.ok) {
                         const cartData: CartApiResponse = await cartResponse.json();
-                         // CORREÇÃO: Removido 'any', usando 'CartItemData'
                         setCartItems(cartData.cartItems.map((item: CartItemData) => ({
                             productId: item.productId,
                             quantity: item.quantity
