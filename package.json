@@ -2,9 +2,9 @@
   "name": "aula2",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
+"scripts": {
     "dev": "set NODE_OPTIONS=--no-warnings --experimental-specifier-resolution=node && node --loader ts-node/esm index.ts",
-    "vercel-build": "npx prisma migrate deploy",
+    "vercel-build": "npx prisma db push",
     "postinstall": "npx prisma generate",
     "start": "node index.js"
   },
