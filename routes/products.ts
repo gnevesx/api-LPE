@@ -1,15 +1,18 @@
-// API_AULA11/routes/products.ts
-
 import { Role } from '@prisma/client';
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import jwt from "jsonwebtoken";
-import prisma from '../prisma/client.js'; // <-- Importação do cliente Prisma centralizado
+import prisma from '../prisma/client.js';
 
 const router = Router();
 
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+  userRole?: Role;
+}
+
 // Middleware de autenticação
-const verifyToken = (req: any, res: any, next: any) => {
+const verifyToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const token = req.headers['x-access-token'];
 
   if (!token) {
@@ -26,41 +29,39 @@ const verifyToken = (req: any, res: any, next: any) => {
   }
 };
 
-// Middleware para verificar se o usuário é ADMIN
-const verifyAdmin = (req: any, res: any, next: any) => {
+// Middleware de verificação de admin
+const verifyAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   if (req.userRole !== Role.ADMIN) {
-    return res.status(403).json({ message: "Acesso negado: Requer privilégios de administrador para esta operação." });
+    return res.status(403).json({ message: "Acesso negado: requer administrador" });
   }
   next();
 };
 
-// Schema para CRIAÇÃO de produto (todos os campos obrigatórios, exceto opcionais explícitos)
+// Schemas Zod
 const productSchema = z.object({
-  name: z.string().min(3, { message: "Nome do produto deve possuir, no mínimo, 3 caracteres" }),
-  description: z.string().min(10, { message: "Descrição do produto deve possuir, no mínimo, 10 caracteres" }).optional().nullable(),
-  price: z.number().positive({ message: "Preço deve ser um número positivo" }),
-  imageUrl: z.string().url({ message: "URL da imagem inválida" }).optional().nullable(),
+  name: z.string().min(3, { message: "Nome deve ter no mínimo 3 caracteres" }),
+  description: z.string().min(10).optional().nullable(),
+  price: z.number().positive({ message: "Preço deve ser positivo" }),
+  imageUrl: z.string().url().optional().nullable(),
   category: z.string().optional().nullable(),
   size: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
-  stock: z.number().int().min(0, { message: "Estoque deve ser um número inteiro não negativo" }).optional().default(0),
+  stock: z.number().int().min(0).optional().default(0),
 });
 
-// NOVO SCHEMA PARA ATUALIZAÇÃO: Todos os campos são opcionais (.optional())
 const productUpdateSchema = z.object({
-  name: z.string().min(3, { message: "Nome do produto deve possuir, no mínimo, 3 caracteres" }).optional(),
-  description: z.string().min(10, { message: "Descrição do produto deve possuir, no mínimo, 10 caracteres" }).optional().nullable(),
-  price: z.number().positive({ message: "Preço deve ser um número positivo" }).optional(),
-  imageUrl: z.string().url({ message: "URL da imagem inválida" }).optional().nullable(),
+  name: z.string().min(3).optional(),
+  description: z.string().min(10).optional().nullable(),
+  price: z.number().positive().optional(),
+  imageUrl: z.string().url().optional().nullable(),
   category: z.string().optional().nullable(),
   size: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
-  stock: z.number().int().min(0, { message: "Estoque deve ser um número inteiro não negativo" }).optional(),
+  stock: z.number().int().min(0).optional(),
 });
 
-
-// Rota: GET /products (Listar todos os produtos)
-router.get("/", async (req, res) => {
+// GET /products
+router.get("/", async (_req: Request, res: Response) => {
   try {
     const products = await prisma.product.findMany();
     res.status(200).json(products);
@@ -70,13 +71,11 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Rota: GET /products/:id (Buscar produto por ID)
-router.get("/:id", async (req, res) => {
+// GET /products/:id
+router.get("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    const product = await prisma.product.findUnique({
-      where: { id }
-    });
+    const product = await prisma.product.findUnique({ where: { id } });
     if (!product) {
       return res.status(404).json({ message: "Produto não encontrado" });
     }
@@ -87,72 +86,56 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Rota: POST /products (Criar novo produto - Apenas ADMIN)
-router.post("/", verifyToken, verifyAdmin, async (req, res) => {
+// POST /products (admin)
+router.post("/", verifyToken, verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   const validation = productSchema.safeParse(req.body);
   if (!validation.success) {
     return res.status(400).json({ errors: validation.error.issues });
   }
 
-  const { name, description, price, imageUrl, category, size, color, stock } = validation.data;
-
   try {
-    const newProduct = await prisma.product.create({
-      data: {
-        name,
-        description,
-        price,
-        imageUrl,
-        category,
-        size,
-        color,
-        stock,
-      }
-    });
-    res.status(201).json(newProduct);
+    const product = await prisma.product.create({ data: validation.data });
+    res.status(201).json(product);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao criar produto" });
   }
 });
 
-// Rota: PUT /products/:id (Atualizar produto - Apenas ADMIN)
-router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
+// PUT /products/:id (admin)
+router.put("/:id", verifyToken, verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  // MUDANÇA AQUI: Usa productUpdateSchema
   const validation = productUpdateSchema.safeParse(req.body);
   if (!validation.success) {
     return res.status(400).json({ errors: validation.error.issues });
   }
 
   try {
-    const updatedProduct = await prisma.product.update({
+    const product = await prisma.product.update({
       where: { id },
-      data: validation.data // validation.data conterá apenas os campos fornecidos
+      data: validation.data
     });
-    res.status(200).json(updatedProduct);
+    res.status(200).json(product);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao atualizar produto" });
   }
 });
 
-// Rota: DELETE /products/:id (Deletar produto - Apenas ADMIN)
-router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
+// DELETE /products/:id (admin)
+router.delete("/:id", verifyToken, verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
-    const deletedProduct = await prisma.product.delete({
-      where: { id }
-    });
-    res.status(200).json({ message: `Produto ${deletedProduct.name} deletado com sucesso.` });
+    const deleted = await prisma.product.delete({ where: { id } });
+    res.status(200).json({ message: `Produto '${deleted.name}' deletado.` });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao deletar produto" });
   }
 });
 
-// Rota: GET /products/search/:term (Pesquisa de produtos)
-router.get("/search/:term", async (req, res) => {
+// GET /products/search/:term
+router.get("/search/:term", async (req: Request, res: Response) => {
   const { term } = req.params;
 
   try {
@@ -163,14 +146,13 @@ router.get("/search/:term", async (req, res) => {
           { description: { contains: term, mode: "insensitive" } },
           { category: { contains: term, mode: "insensitive" } },
           { color: { contains: term, mode: "insensitive" } },
-          // Adicione mais campos para pesquisa se desejar
         ]
       }
     });
     res.status(200).json(products);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Erro ao pesquisar produtos" });
+    res.status(500).json({ error: "Erro na busca" });
   }
 });
 
