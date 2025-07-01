@@ -1,11 +1,9 @@
-
 {
 
   "functions": {
     "dist/index.js": {
     }
   },
- 
   "routes": [
     {
       "src": "/(.*)",
