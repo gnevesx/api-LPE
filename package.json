@@ -1,22 +1,24 @@
 {
-  "name": "aula2",
+  "name": "sua-api-backend",
   "version": "1.0.0",
-  "main": "dist/index.js",
+  "main": "dist/index.js", 
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts", 
+    "build": "tsc", 
+    "postinstall": "npx prisma generate", 
+    "start": "node dist/index.js" 
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "API de E-commerce de Roupas em Node.js com Express e Prisma",
   "type": "module",
   "devDependencies": {
-    "@types/dotenv": "^6.1.1",
+    "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/node": "^22.5.0",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^20.14.9",
     "@types/nodemailer": "^6.4.17",
     "prisma": "^6.5.0",
     "ts-node-dev": "^2.0.0",
@@ -24,9 +26,6 @@
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
-    "@types/bcrypt": "^5.0.2",
-    "@types/cors": "^2.8.17",
-    "@types/jsonwebtoken": "^9.0.9",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",

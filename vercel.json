@@ -1,11 +1,12 @@
 
 {
+
   "functions": {
     "dist/index.js": {
-      "runtime": "nodejs@18.x" 
+      "runtime": "node" 
     }
   },
-
+ 
   "routes": [
     {
       "src": "/(.*)",
