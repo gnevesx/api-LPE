@@ -1,12 +1,13 @@
 {
   "name": "aula2",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "set NODE_OPTIONS=--no-warnings --experimental-specifier-resolution=node && node --loader ts-node/esm index.ts",
-    "vercel-build": "npx prisma db push",
+    "build": "tsc", 
+    "vercel-build": "npx prisma db push", 
     "postinstall": "npx prisma generate",
-    "start": "node index.js"
+    "start": "node dist/index.js" 
   },
   "keywords": [],
   "author": "",
