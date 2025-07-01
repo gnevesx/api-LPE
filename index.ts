@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import dotenv from 'dotenv'; // Importe o dotenv
 import cors from 'cors'; // Importe o pacote cors
 import usersRoutes from './routes/users.js'; // Roteador de usuários
 import productsRoutes from './routes/products.js'; // Roteador de produtos
@@ -30,6 +31,14 @@ process.on('unhandledRejection', (reason, promise) => {
     // Depende da gravidade e da resiliência desejada.
 });
 
+// =================================================================
+// ETAPA 2: CONFIGURAÇÃO INICIAL E IMPORTS
+// =================================================================
+// Carrega as variáveis de ambiente do arquivo .env
+dotenv.config(); // <<<<<<<<<<<<<<<< ESTA LINHA ESTAVA FALTANDO!
+
+console.log('>>> Todos os módulos foram importados com sucesso.');
+
 const app = express();
 // Use a porta do ambiente (definida em .env) ou 3004 como padrão
 const PORT = process.env.PORT ? parseInt(process.env.PORT as string, 10) : 3004;
@@ -39,11 +48,16 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT as string, 10) : 3004;
 // =================================================================
 // CORS: Permite requisições de diferentes origens.
 // Em produção, você deve configurar as origens permitidas de forma mais restritiva.
-app.use(cors({
+const corsOptions = { // Separado para logar a origem
     origin: process.env.FRONTEND_URL || '*', // Permita o frontend especificado ou todas as origens
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Métodos HTTP permitidos
     allowedHeaders: ['Content-Type', 'Authorization'], // Cabeçalhos permitidos
-}));
+};
+
+// Adiciona um log para verificar qual origem está sendo usada
+console.log('>>> CORS configurado com origin:', corsOptions.origin);
+
+app.use(cors(corsOptions)); // Use o objeto corsOptions
 
 // Body Parser: Habilita o Express a ler JSON do corpo das requisições
 app.use(express.json());
